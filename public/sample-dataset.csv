@@ -1,0 +1,51 @@
+order_id,customer_name,region,category,product,quantity,unit_price,revenue,order_date,status,age_group,payment_method
+1001,Alice Johnson,North,Electronics,Laptop,1,1299.99,1299.99,2024-01-05,Completed,25-34,Credit Card
+1002,Bob Smith,South,Clothing,T-Shirt,3,29.99,89.97,2024-01-07,Completed,18-24,PayPal
+1003,Carol White,East,Electronics,Headphones,2,149.99,299.98,2024-01-08,Completed,35-44,Credit Card
+1004,David Brown,West,Food,Coffee Beans,5,14.99,74.95,2024-01-10,Completed,45-54,Debit Card
+1005,Emma Davis,North,Electronics,Tablet,1,499.99,499.99,2024-01-12,Pending,25-34,Credit Card
+1006,Frank Miller,South,Clothing,Jacket,1,89.99,89.99,2024-01-14,Completed,35-44,Credit Card
+1007,Grace Wilson,East,Books,Python Guide,2,39.99,79.98,2024-01-15,Completed,18-24,PayPal
+1008,Henry Taylor,West,Electronics,Monitor,1,349.99,349.99,2024-01-17,Completed,25-34,Credit Card
+1009,Iris Anderson,North,Food,Green Tea,4,9.99,39.96,2024-01-19,Completed,55-64,Debit Card
+1010,James Thomas,South,Books,Data Science,1,49.99,49.99,2024-01-20,Cancelled,35-44,Credit Card
+1011,Karen Jackson,East,Clothing,Dress,2,59.99,119.98,2024-01-22,Completed,25-34,PayPal
+1012,Liam Harris,West,Electronics,Keyboard,1,79.99,79.99,2024-01-24,Completed,18-24,Debit Card
+1013,Mia Martin,North,Food,Olive Oil,3,12.99,38.97,2024-01-25,Completed,45-54,Credit Card
+1014,Noah Garcia,South,Electronics,Smartphone,1,899.99,899.99,2024-01-27,Completed,25-34,Credit Card
+1015,Olivia Martinez,East,Clothing,Sneakers,1,129.99,129.99,2024-01-29,Pending,18-24,PayPal
+1016,Peter Robinson,West,Books,Machine Learning,1,54.99,54.99,2024-01-30,Completed,35-44,Credit Card
+1017,Quinn Clark,North,Food,Pasta,6,4.99,29.94,2024-02-01,Completed,25-34,Debit Card
+1018,Rachel Lewis,South,Electronics,Camera,1,649.99,649.99,2024-02-03,Completed,35-44,Credit Card
+1019,Sam Lee,East,Clothing,Shorts,2,34.99,69.98,2024-02-05,Completed,18-24,PayPal
+1020,Tina Walker,West,Food,Protein Powder,2,39.99,79.98,2024-02-06,Completed,25-34,Credit Card
+1021,Ulrich Hall,North,Electronics,Laptop,1,1199.99,1199.99,2024-02-08,Completed,35-44,Credit Card
+1022,Vera Allen,South,Books,Statistics,1,44.99,44.99,2024-02-10,Completed,45-54,Debit Card
+1023,Will Young,East,Clothing,Hoodie,1,64.99,64.99,2024-02-12,Pending,25-34,Credit Card
+1024,Xena King,West,Electronics,Earbuds,2,89.99,179.98,2024-02-14,Completed,18-24,PayPal
+1025,Yara Scott,North,Food,Coffee Beans,3,14.99,44.97,2024-02-15,Completed,35-44,Debit Card
+1026,Zach Adams,South,Electronics,Tablet,1,449.99,449.99,2024-02-17,Completed,25-34,Credit Card
+1027,Amy Baker,East,Clothing,Jeans,1,79.99,79.99,2024-02-19,Completed,35-44,Credit Card
+1028,Ben Carter,West,Books,Deep Learning,1,59.99,59.99,2024-02-20,Completed,18-24,PayPal
+1029,Cleo Diaz,North,Food,Quinoa,2,8.99,17.98,2024-02-22,Completed,45-54,Debit Card
+1030,Dan Evans,South,Electronics,Monitor,1,379.99,379.99,2024-02-24,Completed,25-34,Credit Card
+1031,Ella Foster,East,Clothing,Blazer,1,119.99,119.99,2024-02-25,Completed,35-44,Credit Card
+1032,Finn Green,West,Electronics,Smartphone,1,799.99,799.99,2024-02-27,Completed,18-24,Credit Card
+1033,Gina Hughes,North,Food,Green Tea,5,9.99,49.95,2024-02-28,Completed,55-64,PayPal
+1034,Hugo Irwin,South,Books,Python Guide,2,39.99,79.98,2024-03-01,Completed,25-34,Debit Card
+1035,Ivy Jones,East,Electronics,Headphones,1,199.99,199.99,2024-03-03,Completed,35-44,Credit Card
+1036,Jack Kelly,West,Clothing,T-Shirt,4,29.99,119.96,2024-03-05,Completed,18-24,PayPal
+1037,Kira Lopez,North,Food,Olive Oil,2,12.99,25.98,2024-03-06,Completed,45-54,Credit Card
+1038,Leo Murphy,South,Electronics,Camera,1,599.99,599.99,2024-03-08,Pending,25-34,Credit Card
+1039,Mia Nelson,East,Clothing,Dress,1,69.99,69.99,2024-03-10,Completed,18-24,PayPal
+1040,Nate Owen,West,Books,Data Science,1,49.99,49.99,2024-03-12,Completed,35-44,Debit Card
+1041,Ora Perez,North,Electronics,Keyboard,2,79.99,159.98,2024-03-13,Completed,25-34,Credit Card
+1042,Paul Quinn,South,Food,Protein Powder,1,39.99,39.99,2024-03-15,Completed,45-54,Credit Card
+1043,Quin Reed,East,Clothing,Jacket,1,99.99,99.99,2024-03-17,Completed,35-44,Credit Card
+1044,Rose Silva,West,Electronics,Laptop,1,1349.99,1349.99,2024-03-18,Completed,25-34,Credit Card
+1045,Sam Turner,North,Books,Machine Learning,1,54.99,54.99,2024-03-20,Completed,18-24,PayPal
+1046,Tara Underwood,South,Food,Pasta,8,4.99,39.92,2024-03-22,Completed,35-44,Debit Card
+1047,Umar Vega,East,Electronics,Earbuds,1,89.99,89.99,2024-03-24,Completed,25-34,Credit Card
+1048,Vicki Walsh,West,Clothing,Sneakers,2,129.99,259.98,2024-03-25,Completed,45-54,Credit Card
+1049,Wade Xu,North,Food,Coffee Beans,4,14.99,59.96,2024-03-27,Completed,18-24,PayPal
+1050,Xara York,South,Electronics,Tablet,1,479.99,479.99,2024-03-29,Completed,35-44,Credit Card
