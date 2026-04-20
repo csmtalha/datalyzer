@@ -1,20 +1,38 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, Printer, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Download, Printer, FileSpreadsheet, Loader2, Lock } from 'lucide-react';
 import { AnalyticsResult } from '@/types/analytics';
+import { useAuth } from '@/components/auth/AuthProvider';
+import UpgradeModal from '@/components/billing/UpgradeModal';
 
 interface ExportButtonsProps {
   result: AnalyticsResult;
 }
 
 export default function ExportButtons({ result }: ExportButtonsProps) {
+  const { limits, user } = useAuth();
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const handleExcelExport = async () => {
+    if (!limits.exports_enabled) {
+      setShowUpgrade(true);
+      return;
+    }
     setExportingExcel(true);
     try {
+      if (user) {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        await supabase.from('usage_logs').insert({
+          user_id: user.id,
+          action: 'export_excel',
+          metadata: { fileName: result.fileName },
+        });
+      }
+
       const res = await fetch('/api/export-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,16 +54,29 @@ export default function ExportButtons({ result }: ExportButtonsProps) {
   };
 
   const handlePDFExport = async () => {
+    if (!limits.exports_enabled) {
+      setShowUpgrade(true);
+      return;
+    }
     setExportingPDF(true);
     try {
+      if (user) {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        await supabase.from('usage_logs').insert({
+          user_id: user.id,
+          action: 'export_pdf',
+          metadata: { fileName: result.fileName },
+        });
+      }
+
       const { default: jsPDF } = await import('jspdf');
       const autoTable = (await import('jspdf-autotable')).default;
-      
+
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const W = 210, margin = 15;
       let y = margin;
 
-      // Header
       doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, W, 40, 'F');
       doc.setTextColor(6, 182, 212);
@@ -59,7 +90,6 @@ export default function ExportButtons({ result }: ExportButtonsProps) {
       doc.text(`Generated: ${new Date(result.processedAt).toLocaleString()}`, W - margin, 28, { align: 'right' });
       y = 50;
 
-      // File Info
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 41, 59);
@@ -71,7 +101,6 @@ export default function ExportButtons({ result }: ExportButtonsProps) {
       doc.text(`${result.rowCount.toLocaleString()} rows × ${result.columnCount} columns`, margin, y);
       y += 12;
 
-      // KPI boxes
       const kpis = [
         { label: 'Records', value: result.rowCount.toLocaleString() },
         { label: 'Columns', value: result.columnCount.toString() },
@@ -94,7 +123,6 @@ export default function ExportButtons({ result }: ExportButtonsProps) {
       });
       y += 26;
 
-      // Insights
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
@@ -116,7 +144,6 @@ export default function ExportButtons({ result }: ExportButtonsProps) {
       }
       y += 6;
 
-      // Summary stats table
       if (y > 220) { doc.addPage(); y = margin; }
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
@@ -144,7 +171,6 @@ export default function ExportButtons({ result }: ExportButtonsProps) {
         margin: { left: margin, right: margin },
       });
 
-      // Correlations
       if (result.correlations.length > 0) {
         doc.addPage();
         y = margin;
@@ -171,35 +197,44 @@ export default function ExportButtons({ result }: ExportButtonsProps) {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
+
+  const isGated = !limits.exports_enabled;
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <button
-        onClick={handlePDFExport}
-        disabled={exportingPDF}
-        className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
-      >
-        {exportingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-        PDF Report
-      </button>
-      <button
-        onClick={handleExcelExport}
-        disabled={exportingExcel}
-        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
-      >
-        {exportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
-        Excel Export
-      </button>
-      <button
-        onClick={handlePrint}
-        className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-xl transition-colors print:hidden"
-      >
-        <Printer className="w-4 h-4" />
-        Print
-      </button>
-    </div>
+    <>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handlePDFExport}
+          disabled={exportingPDF}
+          className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
+        >
+          {exportingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : isGated ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+          PDF Report {isGated && '(Pro)'}
+        </button>
+        <button
+          onClick={handleExcelExport}
+          disabled={exportingExcel}
+          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
+        >
+          {exportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : isGated ? <Lock className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
+          Excel Export {isGated && '(Pro)'}
+        </button>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-xl transition-colors print:hidden"
+        >
+          <Printer className="w-4 h-4" />
+          Print
+        </button>
+      </div>
+
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        reason="Export is available on the Pro plan"
+        feature="Exports"
+      />
+    </>
   );
 }

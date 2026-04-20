@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { analyzeColumns, computeCorrelations, cleanData } from '@/lib/analytics';
 import { generateInsights } from '@/lib/insights';
 import { AnalyticsResult } from '@/types/analytics';
+import { createClient } from '@/lib/supabase/server';
+import { checkUploadAllowed, logUsage } from '@/lib/usage';
+import { PlanType, PLAN_LIMITS } from '@/types/database';
 
 async function parseCSV(text: string): Promise<Record<string, unknown>[]> {
   const lines = text.split('\n').filter(l => l.trim());
   if (lines.length < 2) return [];
-  
-  // Detect delimiter
+
   const delimiters = [',', ';', '\t', '|'];
   const header = lines[0];
-  const delimiter = delimiters.reduce((best, d) => 
+  const delimiter = delimiters.reduce((best, d) =>
     (header.split(d).length > header.split(best).length ? d : best), ',');
-  
+
   const parseRow = (line: string): string[] => {
     const result: string[] = [];
     let current = '';
@@ -31,7 +33,7 @@ async function parseCSV(text: string): Promise<Record<string, unknown>[]> {
     result.push(current.trim());
     return result;
   };
-  
+
   const headers = parseRow(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
   return lines.slice(1).map(line => {
     const values = parseRow(line);
@@ -50,7 +52,6 @@ async function parseXLSX(buffer: ArrayBuffer): Promise<Record<string, unknown>[]
 
 async function parsePDF(buffer: ArrayBuffer): Promise<Record<string, unknown>[]> {
   try {
-    // For PDFs, we extract text and try to parse tabular data
     const uint8 = new Uint8Array(buffer);
     const text = await extractPDFText(uint8);
     return parseTextToTable(text);
@@ -60,11 +61,8 @@ async function parsePDF(buffer: ArrayBuffer): Promise<Record<string, unknown>[]>
 }
 
 async function extractPDFText(data: Uint8Array): Promise<string> {
-  // Simple PDF text extraction - look for text streams
   const decoder = new TextDecoder('latin1');
   const content = decoder.decode(data);
-  
-  // Extract text between BT and ET markers (PDF text objects)
   const textBlocks: string[] = [];
   const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
   let match;
@@ -82,17 +80,13 @@ async function extractPDFText(data: Uint8Array): Promise<string> {
 function parseTextToTable(text: string): Record<string, unknown>[] {
   const lines = text.split(/\n|\r\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) {
-    // Return unstructured text as single column
     return lines.map((line, i) => ({ row: i + 1, content: line }));
   }
-  
-  // Try to detect table structure
   const rows = lines.map(l => l.split(/\s{2,}|\t/).filter(Boolean));
   const maxCols = Math.max(...rows.map(r => r.length));
   if (maxCols < 2) {
     return lines.map((line, i) => ({ row: i + 1, content: line }));
   }
-  
   const headers = rows[0].length >= 2 ? rows[0] : Array.from({ length: maxCols }, (_, i) => `Column ${i + 1}`);
   return rows.slice(1).map(row => {
     const obj: Record<string, unknown> = {};
@@ -123,6 +117,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Unsupported file type: .${ext}` }, { status: 400 });
     }
 
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    let plan: PlanType = 'free';
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', user.id)
+        .single();
+      plan = (profile?.plan ?? 'free') as PlanType;
+
+      const fileSizeMb = file.size / (1024 * 1024);
+      const check = await checkUploadAllowed(supabase, user.id, plan, fileSizeMb);
+      if (!check.allowed) {
+        return NextResponse.json({ error: check.reason, upgrade: true }, { status: 403 });
+      }
+    }
+
     const buffer = await file.arrayBuffer();
     let rawData: Record<string, unknown>[] = [];
 
@@ -140,12 +153,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No data could be extracted from the file.' }, { status: 422 });
     }
 
-    const cleanedData = cleanData(rawData.slice(0, 10000));
+    const limits = PLAN_LIMITS[plan];
+    const maxRows = limits.max_rows;
+    const cleanedData = cleanData(rawData.slice(0, maxRows));
     const columnNames = Object.keys(cleanedData[0] || {});
     const columns = analyzeColumns(cleanedData, columnNames);
     const numericCols = columns.filter(c => c.column.type === 'numeric').map(c => c.column.name);
     const correlations = computeCorrelations(cleanedData, numericCols);
     const insights = generateInsights(columns, correlations, cleanedData.length);
+
+    if (user) {
+      await logUsage(supabase, user.id, 'upload', {
+        fileName: file.name,
+        fileSize: file.size,
+        rowCount: cleanedData.length,
+      });
+
+      await supabase.from('uploads').insert({
+        user_id: user.id,
+        file_name: file.name,
+        file_type: ext,
+        file_size: file.size,
+        row_count: cleanedData.length,
+      });
+    }
 
     const result: AnalyticsResult = {
       fileName: file.name,
@@ -155,7 +186,7 @@ export async function POST(req: NextRequest) {
       columns,
       correlations,
       insights,
-      rawData: cleanedData.slice(0, 500), // return first 500 rows for display
+      rawData: cleanedData.slice(0, 500),
       processedAt: new Date().toISOString(),
     };
 
