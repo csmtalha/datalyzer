@@ -5,7 +5,11 @@ export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !key || url === 'https://placeholder.supabase.co') {
+  const isConfigured = url && key
+    && !url.includes('placeholder') && !url.includes('your-project')
+    && key.startsWith('eyJ');
+
+  if (!isConfigured) {
     return NextResponse.next({ request });
   }
 

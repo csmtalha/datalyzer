@@ -11,7 +11,7 @@ const FEATURES = [
   { icon: BarChart2, title: 'Smart Charts', desc: 'Auto-generated bar, line, pie, histogram, and scatter plots.' },
   { icon: TrendingUp, title: 'AI Insights', desc: 'Automatic trend detection, anomaly alerts, and human-readable summaries.' },
   { icon: FileText, title: 'PDF & Excel Export', desc: 'Download professional reports with one click.' },
-  { icon: Upload, title: 'Multi-Format Upload', desc: 'Supports CSV, Excel, PDF, and Word documents.' },
+  { icon: Upload, title: 'Any File Format', desc: 'Upload CSV, Excel, JSON, XML, PDF, TXT, TSV, or any file with data — we auto-detect the format.' },
   { icon: Shield, title: 'Secure by Default', desc: 'Data processed server-side. Enterprise-grade security.' },
 ];
 
@@ -78,8 +78,8 @@ export default function Home() {
               </span>
             </h1>
             <p className="text-slate-400 max-w-xl mx-auto text-lg leading-relaxed">
-              Drop any CSV, Excel, PDF, or Word file. Datalyze auto-detects structure,
-              runs statistical analysis, detects trends, and generates interactive charts — in seconds.
+              Drop any file with data — CSV, Excel, JSON, XML, TXT, PDF, or even unknown formats.
+              Datalyze auto-detects structure, cleans bad data, runs AI analysis, and generates interactive charts — in seconds.
             </p>
             <div className="flex items-center justify-center gap-4 pt-4">
               <Link

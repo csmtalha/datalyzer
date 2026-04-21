@@ -53,6 +53,39 @@ export interface Insight {
   icon: string;
 }
 
+export interface CleaningReportSummary {
+  originalRows: number;
+  cleanedRows: number;
+  originalCols: number;
+  cleanedCols: number;
+  actions: { type: string; column?: string; description: string; affected: number }[];
+  qualityScore: number;
+  issues: { severity: 'high' | 'medium' | 'low'; message: string }[];
+}
+
+export interface AIInsightItem {
+  headline: string;
+  detail: string;
+  category: 'trend' | 'anomaly' | 'recommendation' | 'summary' | 'pattern';
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface AIAnalysis {
+  summary: string;
+  insights: AIInsightItem[];
+  recommendations: string[];
+  dataStory: string;
+}
+
+export interface Chart3DConfig {
+  type: '3d_scatter' | '3d_surface' | '3d_bar';
+  title: string;
+  xLabel: string;
+  yLabel: string;
+  zLabel: string;
+  data: Record<string, unknown>[];
+}
+
 export interface AnalyticsResult {
   fileName: string;
   fileType: string;
@@ -63,6 +96,9 @@ export interface AnalyticsResult {
   insights: Insight[];
   rawData: Record<string, unknown>[];
   processedAt: string;
+  cleaningReport?: CleaningReportSummary;
+  aiAnalysis?: AIAnalysis;
+  charts3D?: Chart3DConfig[];
 }
 
 export interface ChartConfig {

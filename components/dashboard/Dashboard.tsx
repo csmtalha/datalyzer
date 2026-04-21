@@ -8,25 +8,31 @@ import InsightsPanel from './InsightsPanel';
 import ColumnStats from './ColumnStats';
 import DataTable from './DataTable';
 import ExportButtons from './ExportButtons';
+import CleaningReport from './CleaningReport';
+import AIInsightsPanel from './AIInsightsPanel';
 import { ChartPanel } from '../charts/ChartPanel';
-import { BarChart2, Table, Layers, X, FileText } from 'lucide-react';
+import { Chart3D } from '../charts/Chart3D';
+import { BarChart2, Table, Layers, X, FileText, Wrench, Brain, Box } from 'lucide-react';
 
 interface DashboardProps {
   result: AnalyticsResult;
   onReset: () => void;
 }
 
-type Tab = 'overview' | 'data' | 'columns';
+type Tab = 'overview' | 'data' | 'columns' | 'cleaning' | 'ai' | '3d';
 
 export default function Dashboard({ result, onReset }: DashboardProps) {
   const [tab, setTab] = useState<Tab>('overview');
   const charts = useMemo(() => generateChartConfigs(result.columns, result.rawData), [result]);
   const colNames = Object.keys(result.rawData[0] || {});
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'overview', label: 'Overview', icon: BarChart2 },
-    { id: 'data', label: 'Data Table', icon: Table },
-    { id: 'columns', label: 'Columns', icon: Layers },
+  const tabs: { id: Tab; label: string; icon: React.ElementType; show: boolean }[] = [
+    { id: 'overview', label: 'Overview', icon: BarChart2, show: true },
+    { id: '3d', label: '3D Charts', icon: Box, show: !!result.charts3D && result.charts3D.length > 0 },
+    { id: 'ai', label: 'AI Analysis', icon: Brain, show: !!result.aiAnalysis },
+    { id: 'cleaning', label: 'Cleaning', icon: Wrench, show: !!result.cleaningReport },
+    { id: 'data', label: 'Data Table', icon: Table, show: true },
+    { id: 'columns', label: 'Columns', icon: Layers, show: true },
   ];
 
   return (
@@ -39,9 +45,15 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
               <FileText className="w-4 h-4 text-cyan-400" />
             </div>
             <h1 className="text-xl font-bold text-white truncate max-w-xs">{result.fileName}</h1>
+            {result.aiAnalysis && (
+              <span className="px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[10px] font-semibold rounded-full">
+                AI Enhanced
+              </span>
+            )}
           </div>
           <p className="text-sm text-slate-500 mt-1 ml-11">
             Analyzed {new Date(result.processedAt).toLocaleTimeString()}
+            {result.cleaningReport && ` · Quality: ${result.cleaningReport.qualityScore}/100`}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -60,8 +72,8 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
       <KPICards result={result} />
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-900/60 border border-slate-800 p-1 rounded-xl w-fit">
-        {tabs.map(t => (
+      <div className="flex gap-1 bg-slate-900/60 border border-slate-800 p-1 rounded-xl w-fit flex-wrap">
+        {tabs.filter(t => t.show).map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -80,8 +92,19 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
       {/* Tab Content */}
       {tab === 'overview' && (
         <div className="space-y-8">
+          {/* AI Data Story at the top if available */}
+          {result.aiAnalysis && (
+            <div className="bg-linear-to-br from-violet-500/5 to-cyan-500/5 border border-violet-500/20 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <Brain className="w-4 h-4 text-violet-400" />
+                <span className="text-xs font-semibold text-violet-300 uppercase tracking-wider">AI Data Story</span>
+              </div>
+              <p className="text-sm text-slate-300 leading-relaxed">{result.aiAnalysis.dataStory}</p>
+            </div>
+          )}
+
           <InsightsPanel insights={result.insights} />
-          
+
           {charts.length > 0 && (
             <div>
               <h2 className="text-lg font-bold text-white mb-4">Interactive Charts</h2>
@@ -123,6 +146,33 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
             </div>
           )}
         </div>
+      )}
+
+      {tab === '3d' && result.charts3D && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+              <Box className="w-5 h-5 text-cyan-400" />
+              3D Visualizations
+            </h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Drag to rotate, scroll to zoom, right-click to pan
+            </p>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {result.charts3D.map((chart, i) => (
+              <Chart3D key={i} config={chart} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'ai' && result.aiAnalysis && (
+        <AIInsightsPanel analysis={result.aiAnalysis} />
+      )}
+
+      {tab === 'cleaning' && result.cleaningReport && (
+        <CleaningReport report={result.cleaningReport} />
       )}
 
       {tab === 'data' && (

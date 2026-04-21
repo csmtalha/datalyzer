@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Upload, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 
 interface UploadZoneProps {
   onUpload: (file: File) => void;
@@ -9,27 +9,13 @@ interface UploadZoneProps {
   error: string | null;
 }
 
-const ACCEPTED = ['.csv', '.xlsx', '.xls', '.pdf', '.docx'];
-const ACCEPTED_MIME = [
-  'text/csv',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
+const FILE_BADGES = ['.CSV', '.XLSX', '.PDF', '.DOCX', '.JSON', '.TXT', '.TSV', '.XML', '+MORE'];
 
 export default function UploadZone({ onUpload, isLoading, error }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [dragError, setDragError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const validateAndUpload = useCallback((file: File) => {
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!ACCEPTED.includes(ext)) {
-      setDragError(`Unsupported file type: ${ext}. Use ${ACCEPTED.join(', ')}`);
-      return;
-    }
-    setDragError(null);
+  const handleFile = useCallback((file: File) => {
     onUpload(file);
   }, [onUpload]);
 
@@ -37,8 +23,8 @@ export default function UploadZone({ onUpload, isLoading, error }: UploadZonePro
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) validateAndUpload(file);
-  }, [validateAndUpload]);
+    if (file) handleFile(file);
+  }, [handleFile]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -49,11 +35,9 @@ export default function UploadZone({ onUpload, isLoading, error }: UploadZonePro
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) validateAndUpload(file);
+    if (file) handleFile(file);
     e.target.value = '';
   };
-
-  const displayError = error || dragError;
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -75,7 +59,7 @@ export default function UploadZone({ onUpload, isLoading, error }: UploadZonePro
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPTED.join(',')}
+          accept="*/*"
           onChange={handleFileChange}
           className="hidden"
           disabled={isLoading}
@@ -92,7 +76,7 @@ export default function UploadZone({ onUpload, isLoading, error }: UploadZonePro
               </div>
               <div>
                 <p className="text-lg font-semibold text-slate-200">Analyzing your data...</p>
-                <p className="text-sm text-slate-500 mt-1">This may take a moment</p>
+                <p className="text-sm text-slate-500 mt-1">Cleaning, parsing & running AI analysis</p>
               </div>
             </>
           ) : (
@@ -103,16 +87,16 @@ export default function UploadZone({ onUpload, isLoading, error }: UploadZonePro
               </div>
               <div>
                 <p className="text-xl font-semibold text-slate-200">
-                  {isDragging ? 'Drop to analyze' : 'Upload your dataset'}
+                  {isDragging ? 'Drop to analyze' : 'Upload any data file'}
                 </p>
                 <p className="text-sm text-slate-500 mt-2">
-                  Drag & drop or click to browse
+                  Drag & drop or click to browse — we&apos;ll figure out the format
                 </p>
               </div>
               <div className="flex gap-2 flex-wrap justify-center mt-2">
-                {ACCEPTED.map(ext => (
+                {FILE_BADGES.map(ext => (
                   <span key={ext} className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-400 font-mono border border-slate-700">
-                    {ext.toUpperCase()}
+                    {ext}
                   </span>
                 ))}
               </div>
@@ -121,21 +105,21 @@ export default function UploadZone({ onUpload, isLoading, error }: UploadZonePro
         </div>
       </div>
 
-      {displayError && (
+      {error && (
         <div className="mt-4 flex items-start gap-3 p-4 bg-red-950/40 border border-red-800/60 rounded-xl text-red-400">
           <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-          <p className="text-sm">{displayError}</p>
+          <p className="text-sm">{error}</p>
         </div>
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600">
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4" />
-          <span>Auto-detects columns & types</span>
+          <Sparkles className="w-4 h-4" />
+          <span>Smart format detection</span>
         </div>
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4" />
-          <span>Up to 10,000 rows</span>
+          <span>Auto-cleans bad data</span>
         </div>
       </div>
     </div>
