@@ -1,19 +1,26 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Filter, ArrowRightLeft } from 'lucide-react';
+import { ColumnMappingEntry } from '@/types/analytics';
 
 interface DataTableProps {
   data: Record<string, unknown>[];
   columns: string[];
+  columnMapping?: ColumnMappingEntry[];
 }
 
-export default function DataTable({ data, columns }: DataTableProps) {
+export default function DataTable({ data, columns, columnMapping }: DataTableProps) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [selectedCols, setSelectedCols] = useState<Set<string>>(new Set(columns.slice(0, 8)));
   const [showColPicker, setShowColPicker] = useState(false);
   const pageSize = 20;
+
+  const renamedMap = useMemo(() => {
+    if (!columnMapping) return new Map<string, string>();
+    return new Map(columnMapping.filter(m => m.wasRenamed).map(m => [m.display, m.original]));
+  }, [columnMapping]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return data;
@@ -37,9 +44,11 @@ export default function DataTable({ data, columns }: DataTableProps) {
     setSelectedCols(next);
   };
 
+  const renamedCount = renamedMap.size;
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-3 flex-wrap items-center">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
@@ -50,6 +59,14 @@ export default function DataTable({ data, columns }: DataTableProps) {
             className="w-full pl-9 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
           />
         </div>
+
+        {renamedCount > 0 && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+            <ArrowRightLeft className="w-3 h-3 text-cyan-400" />
+            <span className="text-[10px] text-cyan-400 font-medium">{renamedCount} columns renamed</span>
+          </div>
+        )}
+
         <div className="relative">
           <button
             onClick={() => setShowColPicker(!showColPicker)}
@@ -59,18 +76,26 @@ export default function DataTable({ data, columns }: DataTableProps) {
             Columns ({selectedCols.size})
           </button>
           {showColPicker && (
-            <div className="absolute top-full mt-2 right-0 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-3 min-w-48 max-h-64 overflow-y-auto">
-              {columns.map(col => (
-                <label key={col} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedCols.has(col)}
-                    onChange={() => toggleCol(col)}
-                    className="w-3.5 h-3.5 accent-cyan-500"
-                  />
-                  <span className="text-xs text-slate-300 truncate">{col}</span>
-                </label>
-              ))}
+            <div className="absolute top-full mt-2 right-0 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-3 min-w-56 max-h-64 overflow-y-auto">
+              {columns.map(col => {
+                const originalName = renamedMap.get(col);
+                return (
+                  <label key={col} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedCols.has(col)}
+                      onChange={() => toggleCol(col)}
+                      className="w-3.5 h-3.5 accent-cyan-500"
+                    />
+                    <span className="text-xs text-slate-300 truncate flex-1">{col}</span>
+                    {originalName && (
+                      <span className="text-[10px] text-slate-600 truncate max-w-[80px]" title={originalName}>
+                        was: {originalName}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
             </div>
           )}
         </div>
@@ -81,11 +106,23 @@ export default function DataTable({ data, columns }: DataTableProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800/80">
-                {visibleCols.map(col => (
-                  <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                    {col}
-                  </th>
-                ))}
+                {visibleCols.map(col => {
+                  const originalName = renamedMap.get(col);
+                  return (
+                    <th
+                      key={col}
+                      className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap"
+                      title={originalName ? `Original: ${originalName}` : undefined}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {col}
+                        {originalName && (
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-500/60 flex-shrink-0" title={`Renamed from: ${originalName}`} />
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>

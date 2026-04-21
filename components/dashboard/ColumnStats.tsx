@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { ColumnAnalysis } from '@/types/analytics';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ColumnAnalysis, ColumnMappingEntry } from '@/types/analytics';
+import { ChevronDown, ChevronUp, ArrowRightLeft } from 'lucide-react';
 
 const TYPE_COLORS: Record<string, string> = {
   numeric: 'bg-cyan-900/50 text-cyan-300 border-cyan-800',
@@ -15,20 +15,35 @@ const TYPE_COLORS: Record<string, string> = {
 interface ColStatsProps {
   columns: ColumnAnalysis[];
   rowCount: number;
+  columnMapping?: ColumnMappingEntry[];
 }
 
-export default function ColumnStats({ columns, rowCount }: ColStatsProps) {
+export default function ColumnStats({ columns, rowCount, columnMapping }: ColStatsProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const display = showAll ? columns : columns.slice(0, 8);
 
+  const renamedMap = useMemo(() => {
+    if (!columnMapping) return new Map<string, string>();
+    return new Map(columnMapping.filter(m => m.wasRenamed).map(m => [m.display, m.original]));
+  }, [columnMapping]);
+
   return (
     <div>
-      <h2 className="text-lg font-bold text-white mb-4">Column Analysis</h2>
+      <div className="flex items-center gap-3 mb-4">
+        <h2 className="text-lg font-bold text-white">Column Analysis</h2>
+        {renamedMap.size > 0 && (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-[10px] text-cyan-400 font-medium">
+            <ArrowRightLeft className="w-3 h-3" />
+            {renamedMap.size} auto-renamed
+          </span>
+        )}
+      </div>
       <div className="space-y-2">
         {display.map(col => {
           const isOpen = expanded === col.column.name;
           const nullPct = ((col.column.nullCount / rowCount) * 100).toFixed(1);
+          const originalName = renamedMap.get(col.column.name);
           return (
             <div key={col.column.name} className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
               <button
@@ -38,7 +53,12 @@ export default function ColumnStats({ columns, rowCount }: ColStatsProps) {
                 <span className={`px-2 py-0.5 text-xs rounded-full border ${TYPE_COLORS[col.column.type]}`}>
                   {col.column.type}
                 </span>
-                <span className="flex-1 text-sm font-medium text-slate-200 truncate">{col.column.name}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-slate-200 truncate block">{col.column.name}</span>
+                  {originalName && (
+                    <span className="text-[10px] text-slate-600 truncate block">was: {originalName}</span>
+                  )}
+                </div>
                 <span className="text-xs text-slate-500">{col.column.uniqueCount} unique</span>
                 <span className={`text-xs ${Number(nullPct) > 20 ? 'text-amber-400' : 'text-slate-500'}`}>
                   {nullPct}% null

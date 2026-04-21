@@ -76,7 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (cancelled) return;
         setUser(currentUser);
-        if (currentUser) await fetchProfile(currentUser.id);
+        // Never block the shell on profile fetch — RLS/network can hang forever
+        if (currentUser) void fetchProfile(currentUser.id);
       } catch {
         // auth service unavailable
       } finally {
@@ -92,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const currentUser = session?.user ?? null;
           setUser(currentUser);
           if (currentUser) {
-            await fetchProfile(currentUser.id);
+            void fetchProfile(currentUser.id);
           } else {
             setProfile(null);
           }
@@ -104,8 +105,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
+    const safety = window.setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 12_000);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(safety);
       subscription.unsubscribe();
     };
   }, [configured, fetchProfile]);

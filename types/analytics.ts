@@ -86,6 +86,60 @@ export interface Chart3DConfig {
   data: Record<string, unknown>[];
 }
 
+export type DistributionShape = 'normal' | 'uniform' | 'skewed-right' | 'skewed-left' | 'bimodal' | 'exponential' | 'sparse' | 'unknown';
+export type DataGrade = 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F';
+
+export interface ColumnDistribution {
+  column: string;
+  shape: DistributionShape;
+  skewness: number;
+  kurtosis: number;
+  normalityScore: number;
+}
+
+export interface AnomalyInfo {
+  column: string;
+  value: number;
+  zScore: number;
+  rowIndex: number;
+  severity: 'critical' | 'high' | 'medium';
+}
+
+export interface PatternInfo {
+  type: 'monotonic-increase' | 'monotonic-decrease' | 'periodic' | 'step-change' | 'plateau' | 'spike' | 'trend-reversal';
+  column: string;
+  description: string;
+  confidence: number;
+}
+
+export interface SegmentInfo {
+  column: string;
+  segments: { label: string; count: number; avgNumeric?: Record<string, number> }[];
+}
+
+export interface DataProfile {
+  healthScore: number;
+  grade: DataGrade;
+  completeness: number;
+  consistency: number;
+  uniqueness: number;
+  validity: number;
+  distributions: ColumnDistribution[];
+  anomalies: AnomalyInfo[];
+  patterns: PatternInfo[];
+  segments: SegmentInfo[];
+  typeBreakdown: Record<string, number>;
+  memoryEstimate: string;
+  dimensionality: 'low' | 'medium' | 'high' | 'very-high';
+  complexityScore: number;
+}
+
+export interface ColumnMappingEntry {
+  original: string;
+  display: string;
+  wasRenamed: boolean;
+}
+
 export interface AnalyticsResult {
   fileName: string;
   fileType: string;
@@ -99,6 +153,10 @@ export interface AnalyticsResult {
   cleaningReport?: CleaningReportSummary;
   aiAnalysis?: AIAnalysis;
   charts3D?: Chart3DConfig[];
+  dataProfile?: DataProfile;
+  sheetInfo?: { name: string; rowCount: number }[];
+  columnMapping?: ColumnMappingEntry[];
+  sourceUrl?: string;
 }
 
 export interface ChartConfig {

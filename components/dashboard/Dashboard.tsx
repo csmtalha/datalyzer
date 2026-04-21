@@ -1,8 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { AnalyticsResult } from '@/types/analytics';
+import { analyzeColumns, computeCorrelations } from '@/lib/analytics';
 import { generateChartConfigs } from '@/lib/chartConfig';
+import { generate3DChartConfigs } from '@/lib/chart3DConfig';
+import { generateInsights } from '@/lib/insights';
+import { profileData } from '@/lib/dataProfiler';
+import { applyFilters, pickFilterDimensions, pickDateColumn } from '@/lib/dashboardFilters';
 import KPICards from './KPICards';
 import InsightsPanel from './InsightsPanel';
 import ColumnStats from './ColumnStats';
@@ -10,25 +15,102 @@ import DataTable from './DataTable';
 import ExportButtons from './ExportButtons';
 import CleaningReport from './CleaningReport';
 import AIInsightsPanel from './AIInsightsPanel';
+import AnalysisReport from './AnalysisReport';
+import DatasetFilterBar from './DatasetFilterBar';
 import { ChartPanel } from '../charts/ChartPanel';
 import { Chart3D } from '../charts/Chart3D';
-import { BarChart2, Table, Layers, X, FileText, Wrench, Brain, Box } from 'lucide-react';
+import { BarChart2, Table, Layers, X, FileText, Wrench, Brain, Box, Activity } from 'lucide-react';
 
 interface DashboardProps {
   result: AnalyticsResult;
   onReset: () => void;
 }
 
-type Tab = 'overview' | 'data' | 'columns' | 'cleaning' | 'ai' | '3d';
+type Tab = 'overview' | 'analysis' | 'data' | 'columns' | 'cleaning' | 'ai' | '3d';
 
 export default function Dashboard({ result, onReset }: DashboardProps) {
   const [tab, setTab] = useState<Tab>('overview');
-  const charts = useMemo(() => generateChartConfigs(result.columns, result.rawData), [result]);
-  const colNames = Object.keys(result.rawData[0] || {});
+  const [filters, setFilters] = useState<Record<string, string | null>>({});
+  const [dateMin, setDateMin] = useState<string | null>(null);
+  const [dateMax, setDateMax] = useState<string | null>(null);
+
+  const filterDimensions = useMemo(() => pickFilterDimensions(result.columns), [result.columns]);
+  const dateColumn = useMemo(() => pickDateColumn(result.columns), [result.columns]);
+
+  useEffect(() => {
+    setFilters({});
+    setDateMin(null);
+    setDateMax(null);
+  }, [result.processedAt, result.fileName]);
+
+  const filteredData = useMemo(
+    () => applyFilters(result.rawData, filters, dateColumn, dateMin, dateMax),
+    [result.rawData, filters, dateColumn, dateMin, dateMax]
+  );
+
+  const filteredKeys = useMemo(() => Object.keys(filteredData[0] || result.rawData[0] || {}), [filteredData, result.rawData]);
+
+  const filteredColumns = useMemo(() => {
+    if (filteredData.length === 0) return result.columns;
+    return analyzeColumns(filteredData, filteredKeys);
+  }, [filteredData, filteredKeys, result.columns]);
+
+  const filteredCorr = useMemo(() => {
+    const nums = filteredColumns.filter(c => c.column.type === 'numeric').map(c => c.column.name);
+    return computeCorrelations(filteredData, nums);
+  }, [filteredData, filteredColumns]);
+
+  const charts = useMemo(
+    () => generateChartConfigs(filteredColumns, filteredData),
+    [filteredColumns, filteredData]
+  );
+
+  const filteredInsights = useMemo(
+    () => generateInsights(filteredColumns, filteredCorr, Math.max(1, filteredData.length)),
+    [filteredColumns, filteredCorr, filteredData.length]
+  );
+
+  const filteredProfile = useMemo(
+    () => (filteredData.length > 0 ? profileData(filteredColumns, filteredCorr, filteredData) : null),
+    [filteredData, filteredColumns, filteredCorr]
+  );
+
+  const charts3DFiltered = useMemo(
+    () => generate3DChartConfigs(filteredColumns, filteredData),
+    [filteredColumns, filteredData]
+  );
+
+  const colNames = filteredKeys;
+
+  const filteredView = useMemo(() => {
+    const dimActive = filterDimensions.some(d => {
+      const v = filters[d];
+      return Boolean(v && v !== '__ALL__');
+    });
+    return dimActive || Boolean(dateMin || dateMax);
+  }, [filterDimensions, filters, dateMin, dateMax]);
+
+  const onFilterChange = useCallback((column: string, value: string | null) => {
+    const idx = filterDimensions.indexOf(column);
+    setFilters(prev => {
+      const next = { ...prev, [column]: value };
+      for (let i = idx + 1; i < filterDimensions.length; i++) {
+        next[filterDimensions[i]] = null;
+      }
+      return next;
+    });
+  }, [filterDimensions]);
+
+  const onResetFilters = useCallback(() => {
+    setFilters({});
+    setDateMin(null);
+    setDateMax(null);
+  }, []);
 
   const tabs: { id: Tab; label: string; icon: React.ElementType; show: boolean }[] = [
     { id: 'overview', label: 'Overview', icon: BarChart2, show: true },
-    { id: '3d', label: '3D Charts', icon: Box, show: !!result.charts3D && result.charts3D.length > 0 },
+    { id: 'analysis', label: 'Deep Analysis', icon: Activity, show: !!(filteredProfile ?? result.dataProfile) },
+    { id: '3d', label: '3D Charts', icon: Box, show: charts3DFiltered.length > 0 },
     { id: 'ai', label: 'AI Analysis', icon: Brain, show: !!result.aiAnalysis },
     { id: 'cleaning', label: 'Cleaning', icon: Wrench, show: !!result.cleaningReport },
     { id: 'data', label: 'Data Table', icon: Table, show: true },
@@ -45,15 +127,33 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
               <FileText className="w-4 h-4 text-cyan-400" />
             </div>
             <h1 className="text-xl font-bold text-white truncate max-w-xs">{result.fileName}</h1>
+            {result.dataProfile && (
+              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                result.dataProfile.grade.startsWith('A') ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                result.dataProfile.grade.startsWith('B') ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' :
+                'bg-amber-500/10 border-amber-500/20 text-amber-400'
+              }`}>
+                Grade {result.dataProfile.grade}
+              </span>
+            )}
             {result.aiAnalysis && (
               <span className="px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[10px] font-semibold rounded-full">
                 AI Enhanced
               </span>
             )}
+            <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-mono rounded-full uppercase">
+              {result.fileType}
+            </span>
+            {filteredView && (
+              <span className="px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-[10px] font-semibold rounded-full">
+                Sliced
+              </span>
+            )}
           </div>
           <p className="text-sm text-slate-500 mt-1 ml-11">
             Analyzed {new Date(result.processedAt).toLocaleTimeString()}
-            {result.cleaningReport && ` · Quality: ${result.cleaningReport.qualityScore}/100`}
+            {result.dataProfile && ` · Health: ${result.dataProfile.healthScore}/100`}
+            {result.sheetInfo && ` · ${result.sheetInfo.length} sheets`}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -68,8 +168,28 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <KPICards result={result} />
+      <DatasetFilterBar
+        dimensions={filterDimensions}
+        rawData={result.rawData}
+        filters={filters}
+        onFilterChange={onFilterChange}
+        onReset={onResetFilters}
+        dateColumn={dateColumn}
+        dateMin={dateMin}
+        dateMax={dateMax}
+        onDateMinChange={setDateMin}
+        onDateMaxChange={setDateMax}
+        filteredCount={filteredData.length}
+        totalCount={result.rawData.length}
+      />
+
+      <KPICards
+        result={result}
+        viewRowCount={filteredData.length}
+        viewColumns={filteredColumns}
+        viewCorrelations={filteredCorr}
+        filteredView={filteredView}
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-900/60 border border-slate-800 p-1 rounded-xl w-fit flex-wrap">
@@ -92,7 +212,6 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
       {/* Tab Content */}
       {tab === 'overview' && (
         <div className="space-y-8">
-          {/* AI Data Story at the top if available */}
           {result.aiAnalysis && (
             <div className="bg-linear-to-br from-violet-500/5 to-cyan-500/5 border border-violet-500/20 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-2">
@@ -103,7 +222,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
             </div>
           )}
 
-          <InsightsPanel insights={result.insights} />
+          <InsightsPanel insights={filteredInsights} />
 
           {charts.length > 0 && (
             <div>
@@ -116,11 +235,11 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
             </div>
           )}
 
-          {result.correlations.length > 0 && (
+          {filteredCorr.length > 0 && (
             <div>
               <h2 className="text-lg font-bold text-white mb-4">Correlation Analysis</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {result.correlations.slice(0, 6).map((corr, i) => (
+                {filteredCorr.slice(0, 6).map((corr, i) => (
                   <div key={i} className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className={`px-2 py-0.5 text-xs rounded-full ${
@@ -148,7 +267,11 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
         </div>
       )}
 
-      {tab === '3d' && result.charts3D && (
+      {tab === 'analysis' && (filteredProfile ?? result.dataProfile) && (
+        <AnalysisReport profile={(filteredProfile ?? result.dataProfile)!} />
+      )}
+
+      {tab === '3d' && charts3DFiltered.length > 0 && (
         <div className="space-y-6">
           <div>
             <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
@@ -160,7 +283,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
             </p>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {result.charts3D.map((chart, i) => (
+            {charts3DFiltered.map((chart, i) => (
               <Chart3D key={i} config={chart} />
             ))}
           </div>
@@ -176,11 +299,11 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
       )}
 
       {tab === 'data' && (
-        <DataTable data={result.rawData} columns={colNames} />
+        <DataTable data={filteredData} columns={colNames} columnMapping={result.columnMapping} />
       )}
 
       {tab === 'columns' && (
-        <ColumnStats columns={result.columns} rowCount={result.rowCount} />
+        <ColumnStats columns={filteredColumns} rowCount={Math.max(1, filteredData.length)} columnMapping={result.columnMapping} />
       )}
     </div>
   );

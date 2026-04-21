@@ -27,7 +27,7 @@ interface UsageStats {
 }
 
 export default function DashboardPage() {
-  const { profile, plan, user } = useAuth();
+  const { profile, plan, user, loading: authLoading } = useAuth();
   const [projects, setProjects] = useState<RecentProject[]>([]);
   const [usage, setUsage] = useState<UsageStats>({ uploadsToday: 0, totalUploads: 0, totalExports: 0, totalProjects: 0 });
   const [loading, setLoading] = useState(true);
@@ -35,20 +35,29 @@ export default function DashboardPage() {
   const limits = PLAN_LIMITS[plan];
 
   useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const [projectsRes, usageRes] = await Promise.all([
-        supabase
-          .from('projects')
-          .select('id, name, file_name, row_count, column_count, updated_at')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(5),
-        fetchUsage(),
-      ]);
-      setProjects((projectsRes.data ?? []) as RecentProject[]);
-      setUsage(usageRes);
+    if (authLoading) return;
+    if (!user) {
+      setProjects([]);
+      setUsage({ uploadsToday: 0, totalUploads: 0, totalExports: 0, totalProjects: 0 });
       setLoading(false);
+      return;
+    }
+    const load = async () => {
+      try {
+        const [projectsRes, usageRes] = await Promise.all([
+          supabase
+            .from('projects')
+            .select('id, name, file_name, row_count, column_count, updated_at')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false })
+            .limit(5),
+          fetchUsage(),
+        ]);
+        setProjects((projectsRes.data ?? []) as RecentProject[]);
+        setUsage(usageRes);
+      } finally {
+        setLoading(false);
+      }
     };
 
     const fetchUsage = async (): Promise<UsageStats> => {
@@ -71,8 +80,9 @@ export default function DashboardPage() {
     };
 
     load();
+    // supabase client is session-scoped; user + auth gate drive refetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, authLoading]);
 
   const greeting = () => {
     const hour = new Date().getHours();

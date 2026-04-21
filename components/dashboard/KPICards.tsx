@@ -1,62 +1,76 @@
 'use client';
 
-import { AnalyticsResult } from '@/types/analytics';
-import { Database, Columns, AlertTriangle, TrendingUp } from 'lucide-react';
+import { AnalyticsResult, ColumnAnalysis } from '@/types/analytics';
+import { Database, Columns, AlertTriangle, TrendingUp, Activity, Shield } from 'lucide-react';
 
 interface KPICardsProps {
   result: AnalyticsResult;
+  /** When slicing with filters, pass live stats so KPIs match the chart view */
+  viewRowCount?: number;
+  viewColumns?: ColumnAnalysis[];
+  viewCorrelations?: AnalyticsResult['correlations'];
+  /** True when any dimension / date slice is applied */
+  filteredView?: boolean;
 }
 
-export default function KPICards({ result }: KPICardsProps) {
-  const totalNulls = result.columns.reduce((sum, c) => sum + c.column.nullCount, 0);
-  const nullPct = ((totalNulls / (result.rowCount * result.columnCount)) * 100).toFixed(1);
-  const numericCols = result.columns.filter(c => c.column.type === 'numeric');
-  const strongCorr = result.correlations.filter(c => c.strength === 'strong');
+export default function KPICards({ result, viewRowCount, viewColumns, viewCorrelations, filteredView }: KPICardsProps) {
+  const cols = viewColumns ?? result.columns;
+  const rowCount = viewRowCount ?? result.rowCount;
+  const corrs = viewCorrelations ?? result.correlations;
 
+  const totalNulls = cols.reduce((sum, c) => sum + c.column.nullCount, 0);
+  const denom = rowCount * Math.max(1, cols.length);
+  const nullPct = ((totalNulls / denom) * 100).toFixed(1);
+  const numericCols = cols.filter(c => c.column.type === 'numeric');
+  const strongCorr = corrs.filter(c => c.strength === 'strong');
+  const healthScore = result.dataProfile?.healthScore ?? null;
+  const anomalyCount = result.dataProfile?.anomalies.length ?? 0;
   const cards = [
     {
       label: 'Total Records',
-      value: result.rowCount.toLocaleString(),
-      sub: `${result.columnCount} columns`,
+      value: rowCount.toLocaleString(),
+      sub: filteredView
+        ? `${cols.length} columns · filtered view`
+        : `${result.columnCount} columns · ${result.fileType.toUpperCase()}`,
       icon: Database,
-      color: 'cyan',
       gradient: 'from-cyan-500/20 to-cyan-600/5',
       border: 'border-cyan-500/20',
       iconBg: 'bg-cyan-500/10',
       iconColor: 'text-cyan-400',
     },
     {
+      label: 'Data Health',
+      value: healthScore !== null ? `${healthScore}%` : `${(100 - Number(nullPct)).toFixed(0)}%`,
+      sub: healthScore !== null
+        ? `Grade ${result.dataProfile!.grade} · ${result.dataProfile!.dimensionality} complexity`
+        : `${totalNulls.toLocaleString()} null cells`,
+      icon: Shield,
+      gradient: (healthScore ?? 80) >= 80 ? 'from-emerald-500/20 to-emerald-600/5' : (healthScore ?? 80) >= 60 ? 'from-cyan-500/20 to-cyan-600/5' : 'from-amber-500/20 to-amber-600/5',
+      border: (healthScore ?? 80) >= 80 ? 'border-emerald-500/20' : (healthScore ?? 80) >= 60 ? 'border-cyan-500/20' : 'border-amber-500/20',
+      iconBg: (healthScore ?? 80) >= 80 ? 'bg-emerald-500/10' : (healthScore ?? 80) >= 60 ? 'bg-cyan-500/10' : 'bg-amber-500/10',
+      iconColor: (healthScore ?? 80) >= 80 ? 'text-emerald-400' : (healthScore ?? 80) >= 60 ? 'text-cyan-400' : 'text-amber-400',
+    },
+    {
       label: 'Numeric Fields',
       value: numericCols.length.toString(),
-      sub: `of ${result.columnCount} total columns`,
+      sub: `of ${result.columnCount} total · ${strongCorr.length} strong corr.`,
       icon: TrendingUp,
-      color: 'violet',
       gradient: 'from-violet-500/20 to-violet-600/5',
       border: 'border-violet-500/20',
       iconBg: 'bg-violet-500/10',
       iconColor: 'text-violet-400',
     },
     {
-      label: 'Missing Values',
-      value: `${nullPct}%`,
-      sub: `${totalNulls.toLocaleString()} null cells`,
-      icon: AlertTriangle,
-      color: Number(nullPct) > 20 ? 'amber' : 'emerald',
-      gradient: Number(nullPct) > 20 ? 'from-amber-500/20 to-amber-600/5' : 'from-emerald-500/20 to-emerald-600/5',
-      border: Number(nullPct) > 20 ? 'border-amber-500/20' : 'border-emerald-500/20',
-      iconBg: Number(nullPct) > 20 ? 'bg-amber-500/10' : 'bg-emerald-500/10',
-      iconColor: Number(nullPct) > 20 ? 'text-amber-400' : 'text-emerald-400',
-    },
-    {
-      label: 'Correlations',
-      value: strongCorr.length.toString(),
-      sub: `strong relationships found`,
-      icon: Columns,
-      color: 'pink',
-      gradient: 'from-pink-500/20 to-pink-600/5',
-      border: 'border-pink-500/20',
-      iconBg: 'bg-pink-500/10',
-      iconColor: 'text-pink-400',
+      label: 'Anomalies',
+      value: anomalyCount.toString(),
+      sub: anomalyCount > 0
+        ? `${result.dataProfile?.anomalies.filter(a => a.severity === 'critical').length ?? 0} critical · ${result.dataProfile?.patterns.length ?? 0} patterns`
+        : `No outliers detected · ${Number(nullPct)}% missing`,
+      icon: anomalyCount > 0 ? AlertTriangle : Activity,
+      gradient: anomalyCount > 5 ? 'from-red-500/20 to-red-600/5' : anomalyCount > 0 ? 'from-amber-500/20 to-amber-600/5' : 'from-emerald-500/20 to-emerald-600/5',
+      border: anomalyCount > 5 ? 'border-red-500/20' : anomalyCount > 0 ? 'border-amber-500/20' : 'border-emerald-500/20',
+      iconBg: anomalyCount > 5 ? 'bg-red-500/10' : anomalyCount > 0 ? 'bg-amber-500/10' : 'bg-emerald-500/10',
+      iconColor: anomalyCount > 5 ? 'text-red-400' : anomalyCount > 0 ? 'text-amber-400' : 'text-emerald-400',
     },
   ];
 

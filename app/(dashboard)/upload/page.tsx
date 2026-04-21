@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UploadZone from '@/components/upload/UploadZone';
 import Dashboard from '@/components/dashboard/Dashboard';
@@ -13,6 +13,7 @@ export default function UploadPage() {
   const { plan, limits } = useAuth();
   const [result, setResult] = useState<AnalyticsResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState('');
@@ -21,6 +22,7 @@ export default function UploadPage() {
 
   const handleUpload = async (file: File) => {
     setIsLoading(true);
+    setLoadingMessage('Parsing & cleaning your data...');
     setError(null);
     setResult(null);
     setSaved(false);
@@ -28,6 +30,8 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+
+      setLoadingMessage('Detecting format & renaming columns...');
       const res = await fetch('/api/parse', { method: 'POST', body: formData });
       const data = await res.json();
 
@@ -45,8 +49,74 @@ export default function UploadPage() {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsLoading(false);
+      setLoadingMessage('');
     }
   };
+
+  const handleFetchUrl = useCallback(async (url: string) => {
+    setIsLoading(true);
+    setLoadingMessage('Fetching data from URL...');
+    setError(null);
+    setResult(null);
+    setSaved(false);
+
+    try {
+      setLoadingMessage('Downloading & detecting format...');
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      setLoadingMessage('Running analysis & renaming columns...');
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.upgrade) {
+          setUpgradeReason(data.error);
+          setShowUpgrade(true);
+          setIsLoading(false);
+          return;
+        }
+        throw new Error(data.error || 'Failed to fetch and analyze URL');
+      }
+      setResult(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch URL');
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
+  }, []);
+
+  const handleLoadSample = useCallback(async () => {
+    setIsLoading(true);
+    setLoadingMessage('Loading sample dataset...');
+    setError(null);
+    setResult(null);
+    setSaved(false);
+
+    try {
+      const res = await fetch('/sample-dataset.csv');
+      if (!res.ok) throw new Error('Could not load sample data');
+      const blob = await res.blob();
+      const file = new File([blob], 'sample-dataset.csv', { type: 'text/csv' });
+
+      setLoadingMessage('Analyzing sample data...');
+      const formData = new FormData();
+      formData.append('file', file);
+      const parseRes = await fetch('/api/parse', { method: 'POST', body: formData });
+      const data = await parseRes.json();
+
+      if (!parseRes.ok) throw new Error(data.error || 'Failed to analyze sample');
+      setResult(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load sample');
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
+  }, []);
 
   const handleSaveProject = async () => {
     if (!result) return;
@@ -121,13 +191,33 @@ export default function UploadPage() {
       </div>
 
       {!result && !isLoading && (
-        <UploadZone onUpload={handleUpload} isLoading={isLoading} error={error} />
+        <UploadZone
+          onUpload={handleUpload}
+          onFetchUrl={handleFetchUrl}
+          onLoadSample={handleLoadSample}
+          isLoading={isLoading}
+          error={error}
+        />
       )}
 
       {isLoading && (
         <div>
           <div className="text-center mb-8">
-            <p className="text-slate-400 text-sm">Running analytics engine...</p>
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
+              <p className="text-slate-300 text-sm font-medium">{loadingMessage || 'Running analytics engine...'}</p>
+            </div>
+            <div className="flex justify-center gap-1 mt-3">
+              {['Parsing', 'Cleaning', 'Renaming', 'Analyzing', 'Profiling'].map((step, i) => (
+                <span
+                  key={step}
+                  className="px-2 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-500 border border-slate-700 animate-pulse"
+                  style={{ animationDelay: `${i * 200}ms` }}
+                >
+                  {step}
+                </span>
+              ))}
+            </div>
           </div>
           <LoadingSkeleton />
         </div>
