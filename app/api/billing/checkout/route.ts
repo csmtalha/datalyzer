@@ -33,13 +33,19 @@ export async function POST(req: NextRequest) {
         .eq('id', user.id);
     }
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing?canceled=true`,
+      success_url: `${appUrl}/billing?success=true`,
+      cancel_url: `${appUrl}/billing?canceled=true`,
+      client_reference_id: user.id,
       metadata: { supabase_user_id: user.id },
+      subscription_data: {
+        metadata: { supabase_user_id: user.id },
+      },
     });
 
     return NextResponse.json({ url: session.url });
