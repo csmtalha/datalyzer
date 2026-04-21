@@ -10,6 +10,7 @@ import { AnalyticsResult } from '@/types/analytics';
 import { createClient } from '@/lib/supabase/server';
 import { checkUploadAllowed, logUsage } from '@/lib/usage';
 import { PlanType, PLAN_LIMITS } from '@/types/database';
+import { effectivePlan } from '@/lib/tempPremium';
 
 // ── Parsers ────────────────────────────────────────────────
 
@@ -561,14 +562,14 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    let plan: PlanType = 'free';
+    let plan: PlanType = effectivePlan('free');
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('plan')
         .eq('id', user.id)
         .single();
-      plan = (profile?.plan ?? 'free') as PlanType;
+      plan = effectivePlan((profile?.plan ?? 'free') as PlanType);
 
       const fileSizeMb = file.size / (1024 * 1024);
       const check = await checkUploadAllowed(supabase, user.id, plan, fileSizeMb);

@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { PlanType, PLAN_LIMITS } from '@/types/database';
+import { effectivePlan } from '@/lib/tempPremium';
 
 export async function getUploadsToday(
   supabase: SupabaseClient,
@@ -24,12 +25,12 @@ export async function checkUploadAllowed(
   plan: PlanType,
   fileSizeMb: number
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const limits = PLAN_LIMITS[plan];
+  const limits = PLAN_LIMITS[effectivePlan(plan)];
 
   if (fileSizeMb > limits.max_file_size_mb) {
     return {
       allowed: false,
-      reason: `File exceeds ${limits.max_file_size_mb}MB limit for your ${plan} plan. Upgrade to increase your limit.`,
+      reason: `File exceeds ${limits.max_file_size_mb}MB limit for your ${effectivePlan(plan)} plan. Upgrade to increase your limit.`,
     };
   }
 

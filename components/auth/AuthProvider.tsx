@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Profile, PlanType, PLAN_LIMITS, PlanLimits } from '@/types/database';
+import { effectivePlan } from '@/lib/tempPremium';
 import type { User } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -116,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [configured, fetchProfile]);
 
-  const plan = (profile?.plan ?? 'free') as PlanType;
+  const plan = effectivePlan((profile?.plan ?? 'free') as PlanType);
 
   return (
     <AuthContext.Provider

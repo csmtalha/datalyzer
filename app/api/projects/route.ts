@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { slimAnalyticsForStorage } from '@/lib/slimAnalyticsForStorage';
+import type { AnalyticsResult } from '@/types/analytics';
 import { PLAN_LIMITS, PlanType } from '@/types/database';
+import { effectivePlan } from '@/lib/tempPremium';
 
 export async function GET() {
   try {
@@ -28,12 +31,26 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileErr } = await supabase
       .from('profiles')
       .select('plan')
       .eq('id', user.id)
-      .single();
-    const plan = (profile?.plan ?? 'free') as PlanType;
+      .maybeSingle();
+
+    if (profileErr) console.warn('Profile select:', profileErr.message);
+    if (!profile) {
+      return NextResponse.json(
+        {
+          error: 'No profile row for your account.',
+          details:
+            'Supabase should create this on signup. Add a row in public.profiles with id = your auth user id, or re-run the handle_new_user trigger.',
+          code: 'NO_PROFILE',
+        },
+        { status: 400 }
+      );
+    }
+
+    const plan = effectivePlan((profile.plan ?? 'free') as PlanType);
     const limits = PLAN_LIMITS[plan];
 
     if (limits.saved_projects !== Infinity) {
@@ -51,24 +68,43 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    if (!body?.name || !body?.analyticsData) {
+      return NextResponse.json({ error: 'Missing name or analyticsData' }, { status: 400 });
+    }
+
+    const analytics = slimAnalyticsForStorage(body.analyticsData as AnalyticsResult);
+
     const { data, error } = await supabase
       .from('projects')
       .insert({
         user_id: user.id,
-        name: body.name,
-        file_name: body.fileName,
-        file_type: body.fileType,
-        row_count: body.rowCount,
-        column_count: body.columnCount,
-        analytics_data: body.analyticsData,
+        name: String(body.name).slice(0, 500),
+        file_name: String(body.fileName ?? '').slice(0, 500),
+        file_type: String(body.fileType ?? '').slice(0, 100),
+        row_count: Number(body.rowCount) || 0,
+        column_count: Number(body.columnCount) || 0,
+        analytics_data: analytics as unknown as Record<string, unknown>,
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Project insert error:', error.code, error.message, error.details);
+      const hint =
+        error.code === '23503'
+          ? 'Your account profile row is missing in the database (FK). Try re-signing up or run the profiles trigger.'
+          : error.code === '42501' || error.message?.includes('permission')
+            ? 'Row-level security blocked this insert. Check Supabase policies on public.projects.'
+            : error.message;
+      return NextResponse.json(
+        { error: 'Failed to save project', details: hint, code: error.code },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(data);
   } catch (err) {
     console.error('Project create error:', err);
-    return NextResponse.json({ error: 'Failed to save project' }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Failed to save project';
+    return NextResponse.json({ error: message, details: message }, { status: 500 });
   }
 }

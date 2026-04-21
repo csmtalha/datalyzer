@@ -7,7 +7,8 @@ import Dashboard from '@/components/dashboard/Dashboard';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import UpgradeModal from '@/components/billing/UpgradeModal';
 import { AnalyticsResult } from '@/types/analytics';
-import { Save, Loader2, CheckCircle } from 'lucide-react';
+import { slimAnalyticsForStorage } from '@/lib/slimAnalyticsForStorage';
+import { Save, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function UploadPage() {
   const { plan, limits } = useAuth();
@@ -19,6 +20,7 @@ export default function UploadPage() {
   const [upgradeReason, setUpgradeReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleUpload = async (file: File) => {
     setIsLoading(true);
@@ -121,30 +123,36 @@ export default function UploadPage() {
   const handleSaveProject = async () => {
     if (!result) return;
     setSaving(true);
+    setSaveError(null);
 
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           name: result.fileName.replace(/\.[^.]+$/, ''),
           fileName: result.fileName,
           fileType: result.fileType,
           rowCount: result.rowCount,
           columnCount: result.columnCount,
-          analyticsData: result,
+          analyticsData: slimAnalyticsForStorage(result),
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string; details?: string; code?: string };
 
       if (!res.ok) {
         if (res.status === 403) {
-          setUpgradeReason(data.error);
+          setUpgradeReason(data.error || 'Project limit reached');
           setShowUpgrade(true);
+        } else {
+          setSaveError(data.details || data.error || `Save failed (${res.status})`);
         }
         return;
       }
       setSaved(true);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Network error while saving');
     } finally {
       setSaving(false);
     }
@@ -154,6 +162,7 @@ export default function UploadPage() {
     setResult(null);
     setError(null);
     setSaved(false);
+    setSaveError(null);
   };
 
   return (
@@ -189,6 +198,16 @@ export default function UploadPage() {
           </button>
         )}
       </div>
+
+      {result && saveError && (
+        <div className="flex items-start gap-3 p-4 bg-red-950/40 border border-red-800/60 rounded-xl text-red-300 text-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-red-200">Could not save project</p>
+            <p className="text-red-300/90 mt-1">{saveError}</p>
+          </div>
+        </div>
+      )}
 
       {!result && !isLoading && (
         <UploadZone
