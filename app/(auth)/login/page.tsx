@@ -66,7 +66,7 @@ function LoginForm() {
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8">
-          <button
+          {/* <button
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 text-gray-900 font-medium rounded-xl transition-colors mb-6"
           >
@@ -86,7 +86,7 @@ function LoginForm() {
             <div className="relative flex justify-center text-xs">
               <span className="px-2 bg-slate-900/60 text-slate-500">or continue with email</span>
             </div>
-          </div>
+          </div> */}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
